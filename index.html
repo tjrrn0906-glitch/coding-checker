@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>착인 문구 판독기</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  :root{
+    --bg:#f1ede2;
+    --surface:#ffffff;
+    --surface-2:#faf7ee;
+    --ink:#211c14;
+    --ink-muted:#736a58;
+    --border:#ddd4bd;
+    --accent:#e8b400;
+    --accent-ink:#332600;
+    --accent-soft:#fbecb8;
+    --good:#1c7a4d;
+    --good-soft:#e0f2e6;
+    --bad:#b3261e;
+    --bad-soft:#fbe2df;
+    --warn:#9a6b00;
+    --warn-soft:#fbf0d2;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    --display:'Black Han Sans','Noto Sans KR', sans-serif;
+    --body:'Noto Sans KR', system-ui, -apple-system, sans-serif;
+    --shadow: 0 1px 2px rgba(33,28,20,.06), 0 8px 24px -12px rgba(33,28,20,.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#15130d; --surface:#1e1b13; --surface-2:#252017;
+      --ink:#f2ede0; --ink-muted:#a89b7f; --border:#3a3323;
+      --accent:#f2c230; --accent-ink:#241b00; --accent-soft:#4a3b06;
+      --good:#4fd390; --good-soft:#173226; --bad:#ff8177; --bad-soft:#3a1c19;
+      --warn:#f2c230; --warn-soft:#3a2f06;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#15130d; --surface:#1e1b13; --surface-2:#252017;
+    --ink:#f2ede0; --ink-muted:#a89b7f; --border:#3a3323;
+    --accent:#f2c230; --accent-ink:#241b00; --accent-soft:#4a3b06;
+    --good:#4fd390; --good-soft:#173226; --bad:#ff8177; --bad-soft:#3a1c19;
+    --warn:#f2c230; --warn-soft:#3a2f06;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--body);
+    margin:0; padding:20px 14px 48px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px;margin:0 auto;}
+
+  header{margin-bottom:18px;}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;font-weight:700;letter-spacing:.08em;
+    color:var(--accent-ink);background:var(--accent);
+    padding:3px 9px;border-radius:99px;margin-bottom:10px;
+  }
+  h1{
+    font-family:var(--display); font-weight:400; font-size:clamp(26px,7vw,34px);
+    margin:0 0 4px; letter-spacing:.01em; text-wrap:balance;
+  }
+  .sub{color:var(--ink-muted);font-size:14px;line-height:1.5;margin:0;}
+
+  section{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:18px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .section-title{
+    font-size:12px;font-weight:700;letter-spacing:.06em;
+    color:var(--ink-muted);text-transform:uppercase; margin:0 0 12px;
+  }
+
+  label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--ink);}
+  .field{margin-bottom:14px;}
+  .field:last-child{margin-bottom:0;}
+  input[type=text], input[type=date]{
+    width:100%; font-family:var(--mono); font-size:18px; font-weight:700; letter-spacing:.02em;
+    padding:11px 12px; border:1.5px solid var(--border); border-radius:10px;
+    background:var(--surface-2); color:var(--ink);
+  }
+  input[type=text]:focus, input[type=date]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .hint{font-size:12px;color:var(--ink-muted);margin-top:5px;line-height:1.5;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;}
+  .chip{
+    font-family:var(--mono); font-size:12.5px;font-weight:700;
+    padding:6px 11px;border-radius:99px; border:1.5px solid var(--border);
+    background:var(--surface-2);color:var(--ink-muted); cursor:pointer;
+  }
+  .chip:hover{border-color:var(--accent);color:var(--ink);}
+  .chip.disabled{cursor:default;opacity:.55;}
+  .chip.disabled:hover{border-color:var(--border);color:var(--ink-muted);}
+
+  .status-banner{
+    display:flex;align-items:flex-start;gap:12px; padding:14px 16px;border-radius:12px;margin-bottom:14px;
+    font-weight:700;font-size:15px; line-height:1.4;
+  }
+  .status-banner.ok{background:var(--good-soft);color:var(--good);}
+  .status-banner.bad{background:var(--bad-soft);color:var(--bad);}
+  .status-banner.warn{background:var(--warn-soft);color:var(--warn);}
+  .status-dot{width:10px;height:10px;border-radius:50%;background:currentColor;flex:none;margin-top:5px;}
+
+  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  @media (max-width:420px){ .grid{grid-template-columns:1fr 1fr;} }
+  .tile{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:12px 10px; }
+  .tile .k{font-size:11px;color:var(--ink-muted);font-weight:700;letter-spacing:.04em;margin-bottom:4px;}
+  .tile .v{font-family:var(--mono);font-size:19px;font-weight:700;line-height:1.2;}
+  .tile .check{font-size:11.5px;margin-top:5px;font-weight:700;}
+  .tile .check.match{color:var(--good);}
+  .tile .check.mismatch{color:var(--bad);}
+  .tile .check.na{color:var(--ink-muted);font-weight:500;}
+
+  .expiry-box{
+    text-align:center; padding:20px 14px 18px; border-radius:14px;
+    background:var(--accent-soft); margin-top:14px;
+  }
+  .expiry-box .k{font-size:12px;font-weight:700;color:var(--accent-ink);letter-spacing:.04em;margin-bottom:6px;}
+  .expiry-box .v{
+    font-family:var(--mono);font-weight:700; font-size:clamp(24px,7vw,32px);
+    font-variant-numeric:tabular-nums; color:var(--ink);
+  }
+  .expiry-box .d{font-size:12.5px;color:var(--ink-muted);margin-top:6px;}
+
+  .roadmap{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  footer{font-size:12.5px;color:var(--ink-muted);line-height:1.6;padding:4px 4px 0;}
+  footer strong{color:var(--ink);}
+
+  .photo-dropzone{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; text-align:center; padding:28px 16px; border-radius:14px;
+    border:2px dashed var(--accent); background:var(--accent-soft); cursor:pointer;
+  }
+  .photo-dropzone input{display:none;}
+  .photo-dropzone .icon{font-size:34px;line-height:1;}
+  .photo-dropzone .cta{font-weight:900;font-size:16px;color:var(--accent-ink);}
+  .photo-dropzone .cta-sub{font-size:12.5px;color:var(--accent-ink);opacity:.75;}
+
+  .photo-result-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-top:12px;}
+  .photo-preview-wrap{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+  .photo-preview{
+    max-height:96px;max-width:130px;border-radius:8px;border:1px solid var(--border);
+    object-fit:cover;display:none;flex:none;
+  }
+  .retake-btn{
+    font-family:var(--body);font-weight:700;font-size:13px; padding:8px 12px;border-radius:9px;
+    border:1.5px solid var(--border);background:var(--surface-2);color:var(--ink);cursor:pointer;display:none;
+  }
+  .ocr-status{font-size:13px;color:var(--ink-muted);line-height:1.5;font-weight:500;}
+  .ocr-status.found{color:var(--good);font-weight:700;}
+  .ocr-status.notfound{color:var(--bad);font-weight:600;}
+  .ocr-status.loading{color:var(--ink);font-weight:700;}
+
+  .spinner{
+    width:14px;height:14px;border-radius:50%;
+    border:2px solid var(--border);border-top-color:var(--accent);
+    display:inline-block;vertical-align:-2px;margin-right:6px;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  details.manual{margin-top:14px;}
+  details.manual summary{
+    font-size:13px;font-weight:700;color:var(--ink-muted);cursor:pointer;
+    list-style:none;display:flex;align-items:center;gap:6px;
+  }
+  details.manual summary::-webkit-details-marker{display:none;}
+  details.manual summary::before{content:'▸';font-size:11px;}
+  details.manual[open] summary::before{content:'▾';}
+  details.manual .manual-body{margin-top:12px;}
+
+  textarea{
+    width:100%; font-family:var(--mono); font-size:13px; line-height:1.6;
+    padding:11px 12px; border:1.5px solid var(--border); border-radius:10px;
+    background:var(--surface-2); color:var(--ink); resize:vertical; min-height:130px;
+  }
+  textarea:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  .offline-badge{
+    display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;
+    color:var(--good);background:var(--good-soft);padding:4px 10px;border-radius:99px;margin-top:8px;
+  }
+
+  .step-card{
+    background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+    padding:14px 15px; margin-bottom:10px;
+  }
+  .step-card:last-child{margin-bottom:0;}
+  .step-card .step-title{font-weight:700;font-size:14px;margin-bottom:8px;line-height:1.4;}
+  .step-card .step-basis{font-size:12.5px;color:var(--ink-muted);margin-bottom:10px;line-height:1.5;}
+  .step-card .step-basis b{color:var(--ink);font-family:var(--mono);}
+  .face-row{display:flex;flex-direction:column;gap:6px;}
+  .face{
+    display:flex; align-items:baseline; gap:8px; padding:9px 11px;
+    background:var(--surface); border:1px solid var(--border); border-radius:9px;
+  }
+  .face .face-label{font-size:11px;font-weight:700;color:var(--ink-muted);flex:none;min-width:34px;}
+  .face .face-value{font-family:var(--mono);font-size:14.5px;font-weight:700;color:var(--ink);}
+  .step-card .missing{color:var(--bad);font-size:12.5px;font-weight:700;margin-top:6px;}
+  .empty-hint{
+    text-align:center; color:var(--ink-muted); font-size:13px; padding:20px 10px; line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">벌크라벨 + 포장기준서 · 자동판독</span>
+    <h1>착인 문구 판독기</h1>
+    <p class="sub">벌크라벨 사진과 포장기준서 사진을 올리면 <strong>이 화면(휴대폰) 안에서 바로</strong> 착인 계산 기준을 읽어, 단상자·아웃박스에 실제로 찍을 관리번호·사용기한 문구를 계산해드립니다.</p>
+    <span class="offline-badge">🔒 사진은 서버로 전송되지 않고 이 화면 안에서만 분석돼요</span>
+  </header>
+
+  <section>
+    <p class="section-title">1. 벌크라벨 사진</p>
+    <label class="photo-dropzone" id="dropzoneLabel">
+      <span class="icon">📷</span>
+      <span class="cta">사진 찍기 · 업로드</span>
+      <span class="cta-sub">제조번호/제조일자가 보이도록 찍어주세요</span>
+      <input type="file" id="photoInputLabel" accept="image/*" capture="environment">
+    </label>
+    <div class="photo-result-row" id="photoResultRowLabel" style="display:none;">
+      <div class="photo-preview-wrap">
+        <img class="photo-preview" id="photoPreviewLabel" alt="업로드한 라벨 사진">
+        <p class="ocr-status" id="ocrStatusLabel">분석 대기 중</p>
+      </div>
+      <button class="retake-btn" id="retakeBtnLabel" type="button">다시 찍기</button>
+    </div>
+
+    <details class="manual" id="manualDetailsLabel">
+      <summary>제조번호 · 제조일자 직접 입력 / 수정</summary>
+      <div class="manual-body">
+        <div class="field">
+          <label for="mfg">제조번호</label>
+          <input type="text" id="mfg" placeholder="26W128/CJB" autocomplete="off" spellcheck="false">
+          <p class="hint">형식: [연도2자리][문자1개, 무시][순번3자리]/[검증코드3자리]</p>
+          <div class="chip-row">
+            <button class="chip" type="button" data-example="26W128/CJB|2026-09-02">예시 26W128/CJB</button>
+            <button class="chip" type="button" data-example="26W001/AJB|2026-09-07">예시 26W001/AJB</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="mfgdate">제조일자</label>
+          <input type="date" id="mfgdate">
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <p class="section-title">2. 포장기준서 사진</p>
+    <label class="photo-dropzone" id="dropzoneSpec">
+      <span class="icon">📋</span>
+      <span class="cta">사진 찍기 · 업로드</span>
+      <span class="cta-sub">착인 계산식이 적힌 단계(번호 목록) 부분이 잘 보이게 찍어주세요</span>
+      <input type="file" id="photoInputSpec" accept="image/*" capture="environment">
+    </label>
+    <div class="photo-result-row" id="photoResultRowSpec" style="display:none;">
+      <div class="photo-preview-wrap">
+        <img class="photo-preview" id="photoPreviewSpec" alt="업로드한 포장기준서 사진">
+        <p class="ocr-status" id="ocrStatusSpec">분석 대기 중</p>
+      </div>
+      <button class="retake-btn" id="retakeBtnSpec" type="button">다시 찍기</button>
+    </div>
+
+    <details class="manual" id="manualDetailsSpec">
+      <summary>인식된 글자 확인 / 직접 수정</summary>
+      <div class="manual-body">
+        <div class="field">
+          <label for="specText">포장기준서에서 읽은 글자 (틀린 부분은 사진과 대조해서 직접 고쳐주세요)</label>
+          <textarea id="specText" placeholder="포장기준서 사진을 올리면 여기에 인식된 글자가 채워집니다. 계산식이 안 보이면 여기에 직접 붙여넣거나 입력해도 됩니다.
+예)
+2. 단상자에 용기 포장
+- 하면에 관리번호, EXP사용기한 인쇄
+[36개월-1일, 벌크제조일기준]
+예) ABC
+   EXP[공란]YYYYMMDD"></textarea>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section id="infoSection" hidden>
+    <p class="section-title">3. 확인 · 보정 입력</p>
+    <div class="field">
+      <label for="mgmtCode">관리번호 (착인에 실제로 찍을 값)</label>
+      <input type="text" id="mgmtCode" placeholder="CJB" autocomplete="off" spellcheck="false">
+      <p class="hint">기본값은 벌크라벨 제조번호의 검증코드 3자리예요. 고객사가 별도 대조표로 관리번호를 지정하는 경우(예: 판매문서/배치별 코드표) 직접 고쳐주세요.</p>
+    </div>
+    <div class="field" id="packagingDateField" hidden>
+      <label for="packagingDate">포장일자 (오늘 포장 작업일)</label>
+      <input type="date" id="packagingDate">
+      <p class="hint">이 포장기준서는 벌크 제조일이 아니라 <b>포장일 기준</b>으로 사용기한을 계산해요. 벌크라벨 사진만으로는 알 수 없는 값이라 직접 입력해주세요.</p>
+    </div>
+    <div class="field" id="codeRuleFields" hidden>
+      <label for="mfrCode">제조사코드 (관리번호 앞 2자리)</label>
+      <input type="text" id="mfrCode" placeholder="CM" autocomplete="off" spellcheck="false" maxlength="2">
+      <p class="hint">이 포장기준서는 관리번호를 <b>포장일자로부터 직접 계산</b>해서 만드는 서식이에요(제조사코드 + 연중 며칠째 + 포장년도 끝자리 + 배치번호). 제조사코드는 문서에서 자동으로 채웠어요 — 틀렸으면 고쳐주세요.</p>
+      <div class="field" style="margin-top:10px;">
+        <label for="batchNum">배치번호 (오늘 포장 중 몇 번째 배치인지)</label>
+        <input type="text" id="batchNum" placeholder="1" autocomplete="off" spellcheck="false" inputmode="numeric">
+        <p class="hint">사진만으로는 알 수 없는 값이라 직접 입력해주세요. 하루에 한 배치만 포장한다면 보통 1이에요.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="resultSection" hidden>
+    <p class="section-title">4. 착인 문구 결과</p>
+    <div id="resultBody"></div>
+  </section>
+
+  <section>
+    <p class="section-title">지원 범위 / 알려진 한계</p>
+    <p class="hint" style="margin:0 0 8px;">지금은 자사 로트체계(벌크라벨)와, "번호 붙은 단계 + [기준, N개월-M일] 계산식" 또는 코스맥스 "OPERATION BATCH SHEET"(N년 후 그 달로 반올림) 두 가지 포장기준서 서식을 자동 인식합니다.</p>
+    <div class="roadmap">
+      <span class="chip disabled">그 외 특이 서식 · 순차 추가 예정</span>
+    </div>
+  </section>
+
+  <footer>
+    <strong>확인 방법</strong> — 자동 인식 결과(계산식, 관리번호, 사용기한)는 항상 실제 포장기준서·벌크라벨과 대조해서 확인해주세요. 인식이 틀렸다면 "인식된 글자 확인/직접 수정"란에서 텍스트를 고치면 바로 다시 계산됩니다.<br><br>
+    이 페이지는 서버 없이 휴대폰/PC 브라우저 안에서 직접 글자를 인식합니다. 처음 열 때 인식 엔진(한글 포함, 약 13MB)을 한 번 내려받고, 그 다음부터는 저장된 캐시를 사용해 더 빠르게 열립니다.
+  </footer>
+</div>
+
+<script src="vendor/tesseract.min.js"></script>
+<script src="lot-decode.js"></script>
+<script src="ocr-engine.js"></script>
+<script src="spec-decode.js"></script>
+<script src="spec-ocr-engine.js"></script>
+<script>
+  // ---------- 1. 벌크라벨 ----------
+  const mfgInput = document.getElementById('mfg');
+  const mfgDateInput = document.getElementById('mfgdate');
+  const photoInputLabel = document.getElementById('photoInputLabel');
+  const photoPreviewLabel = document.getElementById('photoPreviewLabel');
+  const photoResultRowLabel = document.getElementById('photoResultRowLabel');
+  const retakeBtnLabel = document.getElementById('retakeBtnLabel');
+  const ocrStatusLabel = document.getElementById('ocrStatusLabel');
+  const manualDetailsLabel = document.getElementById('manualDetailsLabel');
+
+  photoInputLabel.addEventListener('change', async ()=>{
+    const file = photoInputLabel.files && photoInputLabel.files[0];
+    if(!file) return;
+
+    const url = URL.createObjectURL(file);
+    photoPreviewLabel.src = url;
+    photoPreviewLabel.style.display = 'block';
+    photoResultRowLabel.style.display = 'flex';
+    retakeBtnLabel.style.display = 'inline-block';
+    ocrStatusLabel.className = 'ocr-status loading';
+    ocrStatusLabel.innerHTML = '<span class="spinner"></span>준비 중...';
+
+    mfgInput.value = '';
+    mfgDateInput.value = '';
+    renderAll();
+
+    try{
+      const data = await OcrEngine.analyzeLabelImage(file, {
+        years: 3, minusDay: false,
+        onProgress: (msg)=>{ ocrStatusLabel.innerHTML = '<span class="spinner"></span>' + msg; }
+      });
+
+      let found = false;
+      if(data.found_mfg){ mfgInput.value = data.found_mfg; found = true; }
+      else if(data.low_confidence_guess){ mfgInput.value = data.low_confidence_guess; }
+      if(data.found_date){ mfgDateInput.value = data.found_date; found = true; }
+      else if(data.low_confidence_date_guess){ mfgDateInput.value = data.low_confidence_date_guess; }
+
+      const mfgUnsure = !data.found_mfg && data.low_confidence_guess;
+      const dateUnsure = !data.found_date && data.low_confidence_date_guess;
+
+      if(data.found_mfg && data.found_date){
+        ocrStatusLabel.className = 'ocr-status found';
+        ocrStatusLabel.textContent = '자동으로 읽었어요 — 사진과 대조해서 꼭 확인해주세요.';
+      } else if(mfgUnsure || dateUnsure){
+        ocrStatusLabel.className = 'ocr-status notfound';
+        ocrStatusLabel.textContent = '확신도가 낮아 추정만 했어요. 사진을 보면서 직접 확인/수정해주세요.';
+        manualDetailsLabel.open = true;
+      } else if(found){
+        ocrStatusLabel.className = 'ocr-status found';
+        ocrStatusLabel.textContent = '일부만 자동으로 읽었어요. 나머지는 직접 입력해주세요.';
+        manualDetailsLabel.open = true;
+      } else {
+        ocrStatusLabel.className = 'ocr-status notfound';
+        ocrStatusLabel.textContent = '자동으로 읽지 못했어요. 아래에 직접 입력해주세요.';
+        manualDetailsLabel.open = true;
+      }
+      updateMgmtCodeDefault();
+      renderAll();
+    }catch(e){
+      ocrStatusLabel.className = 'ocr-status notfound';
+      ocrStatusLabel.textContent = '분석에 실패했어요. 아래에 직접 입력해주세요.';
+      manualDetailsLabel.open = true;
+    }
+  });
+  retakeBtnLabel.addEventListener('click', ()=>{ photoInputLabel.value = ''; photoInputLabel.click(); });
+  document.querySelectorAll('[data-example]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [code,date] = btn.dataset.example.split('|');
+      mfgInput.value = code; mfgDateInput.value = date;
+      updateMgmtCodeDefault(); renderAll();
+    });
+  });
+  mfgInput.addEventListener('input', ()=>{ updateMgmtCodeDefault(); renderAll(); });
+  mfgDateInput.addEventListener('input', renderAll);
+
+  // ---------- 2. 포장기준서 ----------
+  const photoInputSpec = document.getElementById('photoInputSpec');
+  const photoPreviewSpec = document.getElementById('photoPreviewSpec');
+  const photoResultRowSpec = document.getElementById('photoResultRowSpec');
+  const retakeBtnSpec = document.getElementById('retakeBtnSpec');
+  const ocrStatusSpec = document.getElementById('ocrStatusSpec');
+  const manualDetailsSpec = document.getElementById('manualDetailsSpec');
+  const specText = document.getElementById('specText');
+
+  photoInputSpec.addEventListener('change', async ()=>{
+    const file = photoInputSpec.files && photoInputSpec.files[0];
+    if(!file) return;
+
+    const url = URL.createObjectURL(file);
+    photoPreviewSpec.src = url;
+    photoPreviewSpec.style.display = 'block';
+    photoResultRowSpec.style.display = 'flex';
+    retakeBtnSpec.style.display = 'inline-block';
+    ocrStatusSpec.className = 'ocr-status loading';
+    ocrStatusSpec.innerHTML = '<span class="spinner"></span>준비 중...';
+    specText.value = '';
+    renderAll();
+
+    try{
+      const data = await SpecOcrEngine.analyzeSpecImage(file, {
+        onProgress: (msg)=>{ ocrStatusSpec.innerHTML = '<span class="spinner"></span>' + msg; }
+      });
+      specText.value = data.text.trim();
+      const hasCoding = data.parsed.entries.some(e => e.is_coding_step || e.has_expiry_on_label);
+      if(hasCoding){
+        ocrStatusSpec.className = 'ocr-status found';
+        ocrStatusSpec.textContent = '착인 계산식을 찾았어요 — 아래 결과와 원본 사진을 대조해서 확인해주세요.';
+      } else {
+        ocrStatusSpec.className = 'ocr-status notfound';
+        ocrStatusSpec.textContent = '착인 계산식을 못 찾았어요. 아래 "인식된 글자"를 사진과 비교해 직접 고쳐주세요.';
+        manualDetailsSpec.open = true;
+      }
+      renderAll();
+    }catch(e){
+      ocrStatusSpec.className = 'ocr-status notfound';
+      ocrStatusSpec.textContent = '분석에 실패했어요. 아래에 글자를 직접 입력/붙여넣기 해주세요.';
+      manualDetailsSpec.open = true;
+    }
+  });
+  retakeBtnSpec.addEventListener('click', ()=>{ photoInputSpec.value = ''; photoInputSpec.click(); });
+  specText.addEventListener('input', renderAll);
+
+  // ---------- 3. 확인/보정 입력 ----------
+  const infoSection = document.getElementById('infoSection');
+  const mgmtCodeInput = document.getElementById('mgmtCode');
+  const packagingDateField = document.getElementById('packagingDateField');
+  const packagingDateInput = document.getElementById('packagingDate');
+  const codeRuleFields = document.getElementById('codeRuleFields');
+  const mfrCodeInput = document.getElementById('mfrCode');
+  const batchNumInput = document.getElementById('batchNum');
+  let mgmtCodeTouched = false;
+  let mfrCodeTouched = false;
+  mgmtCodeInput.addEventListener('input', ()=>{ mgmtCodeTouched = true; renderAll(); });
+  packagingDateInput.addEventListener('input', renderAll);
+  mfrCodeInput.addEventListener('input', ()=>{ mfrCodeTouched = true; renderAll(); });
+  batchNumInput.addEventListener('input', renderAll);
+
+  function updateMgmtCodeDefault(){
+    if(mgmtCodeTouched) return;
+    const raw = (mfgInput.value || '').trim().toUpperCase();
+    const m = raw.match(/\/([A-Z0-9]{3})$/);
+    if(m) mgmtCodeInput.value = m[1];
+  }
+
+  // ---------- 4. 결과 렌더링 ----------
+  const resultSection = document.getElementById('resultSection');
+  const resultBody = document.getElementById('resultBody');
+
+  function opsDescription(ops){
+    return ops.map(o => (o.sign>0?'+':'-') + o.amount + o.unit).join(' ');
+  }
+
+  function faceRowHtml(label, face, values){
+    if(!face) return '';
+    const text = SpecDecode.renderStampText(face, values);
+    return `<div class="face"><span class="face-label">${label}</span><span class="face-value">${text || '(내용 없음)'}</span></div>`;
+  }
+
+  function renderPackagingSpecResults(entries, mgmtCode, bulkMfgDateIso, packagingDateIso, mfrCode, batchNum){
+    const codingSteps = entries.filter(e => e.is_coding_step);
+    if(!codingSteps.length){
+      return '<p class="empty-hint">착인 계산식이 있는 단계를 찾지 못했어요. 위 "인식된 글자" 텍스트를 사진과 대조해서 직접 고쳐주세요.</p>';
+    }
+    let html = '';
+    let needsPackagingDate = false;
+    let needsCodeRuleFields = false;
+    let lastDateFmt = null; // 관리번호/사용기한 형식 설명이 처음 나온 단계에만 있고 뒤 단계는 값만 반복하는 경우 대비
+
+    for(const step of codingSteps){
+      const basis = step.basis;
+      const fmt = step.format;
+      const codeRule = step.code_rule || null;
+      let baseIso = null, basisLabel = '';
+      if(codeRule || (basis && basis.basis_type === 'packaging_date')){
+        baseIso = packagingDateIso || null;
+        basisLabel = '포장일';
+        if(!baseIso) needsPackagingDate = true;
+      } else {
+        baseIso = bulkMfgDateIso || null;
+        basisLabel = '벌크제조일';
+      }
+
+      html += `<div class="step-card"><div class="step-title">${escapeHtml(step.title)}</div>`;
+
+      if(!basis || !basis.ops || !basis.ops.length){
+        html += `<div class="step-basis">계산식을 인식하지 못했어요. 원문: <b>${escapeHtml(basis ? basis.raw : '')}</b></div></div>`;
+        continue;
+      }
+
+      if(!baseIso){
+        html += `<div class="step-basis">기준: <b>${basisLabel}</b> · 계산: <b>${opsDescription(basis.ops)}</b></div>`;
+        html += `<div class="missing">${basisLabel} 값이 없어 사용기한을 계산할 수 없어요 — ${basisLabel === '포장일' ? '위에서 포장일자를 입력해주세요.' : '벌크라벨 제조일자를 입력해주세요.'}</div></div>`;
+        continue;
+      }
+
+      const baseParts = SpecDecode.isoToParts(baseIso);
+      const expiryParts = SpecDecode.applyOps(baseParts, basis.ops);
+      const expiryIso = SpecDecode.partsToIso(expiryParts);
+
+      html += `<div class="step-basis">기준: <b>${basisLabel} ${baseIso}</b> · 계산: <b>${opsDescription(basis.ops)}</b> → 사용기한 <b>${expiryIso}</b></div>`;
+
+      if(codeRule){
+        needsCodeRuleFields = true;
+        const effectiveMfrCode = (mfrCode || codeRule.mfr_code || '').toUpperCase();
+        const computedCode = SpecDecode.buildDayOfYearCode(effectiveMfrCode, baseParts, batchNum);
+        const doy = SpecDecode.dayOfYear(baseParts.y, baseParts.mo, baseParts.d);
+        const ownDateFmt = (fmt && ((fmt.front_face && fmt.front_face.date_format) || (fmt.back_face && fmt.back_face.date_format))) || null;
+        const dateFmt = ownDateFmt || lastDateFmt;
+        if(ownDateFmt) lastDateFmt = ownDateFmt;
+        const expiryDisplay = dateFmt ? SpecDecode.formatDateByPattern(expiryParts, dateFmt) : expiryIso;
+        html += `<div class="step-basis">관리번호 계산: <b>${escapeHtml(effectiveMfrCode || '(제조사코드?)')}</b> + <b>${SpecDecode.pad3(doy)}</b>(연중 ${doy}번째 날) + <b>${baseParts.y % 10}</b>(${baseParts.y}년 끝자리) + <b>${escapeHtml(String(batchNum||''))}</b>(배치번호)</div>`;
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">관리번호 ${computedCode || '(미입력)'} + 사용기한 ${expiryDisplay || '(미입력)'}</span></div></div>`;
+        html += `</div>`;
+        continue;
+      }
+
+      const values = { code: mgmtCode, mfgStr: baseIso, expiryStr: expiryIso };
+      if(fmt && fmt.is_split_face){
+        html += `<div class="face-row">` + faceRowHtml('전면', fmt.front_face, values) + faceRowHtml('후면', fmt.back_face, values) + `</div>`;
+      } else if(fmt && fmt.front_face){
+        html += `<div class="face-row">` + faceRowHtml('각인', fmt.front_face, values) + `</div>`;
+      } else {
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">관리번호 ${mgmtCode || '(미입력)'} + 사용기한 ${expiryIso}</span></div></div>`;
+      }
+      html += `</div>`;
+    }
+
+    packagingDateField.hidden = !needsPackagingDate;
+    codeRuleFields.hidden = !needsCodeRuleFields;
+    return html;
+  }
+
+  function renderBatchSheetResults(entries, mgmtCode, bulkMfgDateIso){
+    packagingDateField.hidden = true; // 지금까지 확인된 OPERATION BATCH SHEET 서식은 전부 벌크제조일 기준
+    codeRuleFields.hidden = true;
+    if(!bulkMfgDateIso){
+      return '<div class="missing" style="margin:4px 0 0;">벌크라벨 제조일자를 입력해야 사용기한을 계산할 수 있어요.</div>';
+    }
+    const baseParts = SpecDecode.isoToParts(bulkMfgDateIso);
+    let html = '';
+    for(const v of entries){
+      html += `<div class="step-card"><div class="step-title">${escapeHtml(v.market)} ${escapeHtml(v.part)}</div>`;
+      if(!v.expiry_rule){
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">관리번호(MFG코드) ${mgmtCode || '(미입력)'} — 이 자리엔 사용기한 없이 코드만 찍어요</span></div></div></div>`;
+        continue;
+      }
+      const rounded = SpecDecode.applyRoundingBasis(baseParts, v.expiry_rule);
+      const expiryStr = SpecDecode.formatRoundedExpiry(rounded, v.expiry_rule.round_to);
+      html += `<div class="step-basis">기준: <b>벌크제조일 ${bulkMfgDateIso}</b> · 계산: <b>+${v.expiry_rule.years}년, 그 달${v.expiry_rule.round_to==='month_start'?'의 1일':''}로 반올림</b></div>`;
+      html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">관리번호 ${mgmtCode || '(미입력)'} + 사용기한 ${expiryStr}</span></div></div></div>`;
+    }
+    return html;
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderAll(){
+    const text = specText.value.trim();
+    const bulkMfgDateIso = mfgDateInput.value || null;
+    const mgmtCode = mgmtCodeInput.value.trim();
+
+    if(!text){
+      resultSection.hidden = true;
+      packagingDateField.hidden = true;
+      infoSection.hidden = true;
+      return;
+    }
+
+    infoSection.hidden = false;
+    resultSection.hidden = false;
+
+    const doc = SpecDecode.parseDocument(text);
+    if(doc.style === 'batch_sheet'){
+      resultBody.innerHTML = renderBatchSheetResults(doc.entries, mgmtCode, bulkMfgDateIso);
+    } else {
+      if(!mfrCodeTouched){
+        const found = doc.entries.find(e => e.code_rule && e.code_rule.mfr_code);
+        if(found) mfrCodeInput.value = found.code_rule.mfr_code;
+      }
+      resultBody.innerHTML = renderPackagingSpecResults(
+        doc.entries, mgmtCode, bulkMfgDateIso, packagingDateInput.value || null,
+        mfrCodeInput.value.trim(), batchNumInput.value.trim() || '1'
+      );
+    }
+  }
+</script>
+</body>
+</html>
