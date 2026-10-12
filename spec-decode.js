@@ -33,6 +33,12 @@
     const blocks = [];
     let current = null;
     let blankRun = 0;
+    // OCR이 번호 자체("2.")를 다른 글자로 잘못 읽는 경우가 실제로 있다(예: "2."가
+    // "lo"나 "locate"로 오인식됨) - 이러면 그 단계의 계산식 줄까지 통째로 "번호 없는
+    // 줄"로 취급돼 아예 버려지던 문제가 있었다. 첫 번호 단계가 나오기 전의 내용도
+    // preamble 블록(no: null)으로 따로 모아뒀다가, 끝에 계산식/코드규칙처럼 보이는
+    // 내용이 있으면 결과에 포함시킨다(그 외엔 어차피 is_coding_step이 false로 걸러짐).
+    let preamble = [];
 
     for (const line of lines) {
       const stripped = line.trim();
@@ -50,14 +56,22 @@
       blankRun = 0;
 
       const m = line.match(/^\s*(\d+)\s*[.)]\s*(.*)$/);
-      if (m) {
+      // OCR 잡음(예: "EXP[공란]YYYYMMDD까지"가 깨져서 "1)YYYYMMODJIAT"처럼 읽히는 경우)이
+      // 숫자+구두점 패턴에 우연히 맞아떨어져 가짜 단계 경계로 오인되는 걸 막기 위해,
+      // 번호 뒤 제목에 한글이 하나라도 있어야 "진짜" 새 단계 시작으로 인정한다.
+      // 실측한 모든 포장기준서에서 실제 단계 제목은 예외 없이 번호 바로 뒤에 한글이 온다.
+      const isGenuineStepStart = m && /[가-힣]/.test(m[2]);
+      if (isGenuineStepStart) {
         if (current) blocks.push(current);
         current = { no: parseInt(m[1], 10), lines: [line] };
       } else if (current !== null) {
         current.lines.push(line);
+      } else {
+        preamble.push(line);
       }
     }
     if (current) blocks.push(current);
+    if (preamble.length) blocks.unshift({ no: null, lines: preamble });
     return blocks;
   }
 
@@ -75,7 +89,13 @@
       } else if (closers[ch]) {
         if (stack.length && stack[stack.length - 1][0] === closers[ch]) {
           const [, start] = stack.pop();
-          if (stack.length === 0) spans.push(text.slice(start + 1, i));
+          // 예전엔 바깥쪽 괄호까지 완전히 다 닫혀서 스택이 비었을 때만(최상위 구간만)
+          // 기록했는데, 실제 사진에서 OCR이 괄호 한쪽을 다른 글자로 잘못 읽어
+          // (예: "[...좌측]"의 "]"가 ")"로 깨짐) 그 뒤에 나오는 진짜 계산식 대괄호까지
+          // "안쪽에 중첩된 것"처럼 보여 통째로 버려지는 문제가 있었다. 짝이 맞게
+          // 닫히기만 하면(중첩 여부와 무관하게) 바로 기록해서 이런 깨진 괄호 하나
+          // 때문에 뒤쪽 내용 전체가 묻히지 않게 한다.
+          spans.push(text.slice(start + 1, i));
         }
       }
     }
@@ -153,6 +173,11 @@
     if (pattern === "YYYY-MM") return `${y}-${mo}`;
     if (pattern === "YYYYMM") return `${y}${mo}`;
     if (pattern === "YY/MM/DD") return `${yy}/${mo}/${d}`;
+    if (pattern === "DDMMYYYY") return `${d}${mo}${y}`;
+    if (pattern === "DD-MM-YYYY") return `${d}-${mo}-${y}`;
+    if (pattern === "MMDDYYYY") return `${mo}${d}${y}`;
+    if (pattern === "MM-DD-YYYY") return `${mo}-${d}-${y}`;
+    if (pattern === "MM-YYYY") return `${mo}-${y}`;
     return `${y}-${mo}-${d}`;
   }
 
@@ -182,6 +207,114 @@
     return { rule_type: "day_of_year_code", mfr_code: m ? m[1].toUpperCase() : null, raw: blockText };
   }
 
+  // ---------- 고운세상코스메틱(Dr.G) "GEN/LOK" 코딩체계 ----------
+  // 관리번호 = NC(고정) + 충전년코드(1자) + 충전월코드(1자) + 해당월 충전일순번(1~2자) + S(고정)
+  // 충전년코드: I/O/Q/V 제외 22개 알파벳을 W=2022년부터 순환 배정 (W,X,Y,Z,A,B,...)
+  const GEN_LOK_VALID_LETTERS = "ABCDEFGHJKLMNPRSTUWXYZ".split(""); // I,O,Q,V 제외, 22개
+  const GEN_LOK_YEAR_START_LETTER = "W";
+  const GEN_LOK_YEAR_START = 2022;
+  // 충전월코드: 1~9월은 숫자 그대로, 10/11/12월은 전용 알파벳(자사 월코드 체계와는 다른 별도 매핑)
+  const GEN_LOK_MONTH_LETTER = { 10: "O", 11: "N", 12: "D" };
+  // 사용기한: 캘린더 월 계산이 아니라 "문서에 사용기한 직접계산금지"로 명시된 고정 일수표를
+  // 충전일(또는 포장일)에 더하는 방식 - 표에 없는 개월수는 계산하지 않고 안내만 한다.
+  const GEN_LOK_DAY_FIXED_TABLE = { 36: 1095, 30: 912, 24: 730 };
+
+  function genLokYearLetter(year) {
+    const n = GEN_LOK_VALID_LETTERS.length;
+    const startIdx = GEN_LOK_VALID_LETTERS.indexOf(GEN_LOK_YEAR_START_LETTER);
+    const offset = year - GEN_LOK_YEAR_START;
+    const idx = ((startIdx + offset) % n + n) % n;
+    return GEN_LOK_VALID_LETTERS[idx];
+  }
+
+  function genLokMonthCode(month) {
+    if (GEN_LOK_MONTH_LETTER[month]) return GEN_LOK_MONTH_LETTER[month];
+    if (month >= 1 && month <= 9) return String(month);
+    return null;
+  }
+
+  function buildGenLokCode(baseParts, daySeq) {
+    if (!baseParts || daySeq == null || String(daySeq).trim() === "") return null;
+    const yearL = genLokYearLetter(baseParts.y);
+    const monC = genLokMonthCode(baseParts.mo);
+    if (!monC) return null;
+    return `NC${yearL}${monC}${String(daySeq).trim().toUpperCase()}S`;
+  }
+
+  function genLokFixedDays(months) {
+    return GEN_LOK_DAY_FIXED_TABLE[months] != null ? GEN_LOK_DAY_FIXED_TABLE[months] : null;
+  }
+
+  function applyFixedDays(baseParts, days) {
+    const utc = Date.UTC(baseParts.y, baseParts.mo - 1, baseParts.d) + days * 86400000;
+    const dt = new Date(utc);
+    return { y: dt.getUTCFullYear(), mo: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+  }
+
+  // "충전년코드"+"충전월코드" 두 용어가 함께 있으면 Dr.G(GEN)/LOK 서식으로 판단한다
+  // (오탐 가능성이 매우 낮은 고유 용어 조합).
+  function parseGenLokCodeRule(blockText) {
+    if (!/충전년코드/.test(blockText) || !/충전월코드/.test(blockText)) return null;
+    const m = blockText.match(/(\d+)\s*개월/);
+    const months = m ? parseInt(m[1], 10) : null;
+    const fixedDays = months != null ? genLokFixedDays(months) : null;
+    return { rule_type: "gen_lok_code", months, fixed_days: fixedDays, raw: blockText };
+  }
+
+  // ---------- COSMAX California Corp./NATURIUM 줄리안데이 로트체계 ----------
+  // 관리번호(LOT#) = X(고정, 코스맥스) + 연도숫자(그 해 끝자리) + 줄리안데이 3자리(충진일 기준) +
+  // 당일배치문자(A=그날 첫 벌크배치, B=두번째...) - 문서 원문에 "줄리안 달력 날짜"라는
+  // 표현이 쓰여 있어 이를 고유 트리거로 사용한다.
+  function buildCosmaxCaJulianCode(baseParts, batchLetter) {
+    if (!baseParts || !batchLetter) return null;
+    const doy = dayOfYear(baseParts.y, baseParts.mo, baseParts.d);
+    return `X${baseParts.y % 10}${pad3(doy)}${String(batchLetter).trim().toUpperCase()}`;
+  }
+
+  function parseCosmaxCaJulianCodeRule(blockText) {
+    if (!/줄리안/.test(blockText)) return null;
+    return { rule_type: "cosmax_ca_julian_code", raw: blockText };
+  }
+
+  // ---------- LG생활건강(더페이스샵 등) 새 관리번호 체계 ----------
+  // 관리번호 = 벌크제조년도 끝자리(1자리) + 벌크제조번호를 엑셀 컬럼식 알파벳으로 변환한 값
+  // (1=A,2=B...9=I 포함,26=Z,27=AA... - 자사 로트체계의 I제외 규칙과는 무관한 별도 체계)
+  // 고객사명(LG생활건강/더페이스샵)은 보통 문서 맨 위 제목에만 한 번 적혀 있고 각
+  // 번호 단계 본문에는 반복되지 않는 경우가 많다. 그래서 고객사 언급 여부는
+  // 문서 전체(docWideHasCustomer)에서 판단하고, 계산 키워드("끝자리", "알파벳")만
+  // 해당 단계 블록 안에서 확인한다.
+  function parseLgHcCodeRule(blockText, docWideHasCustomer) {
+    const hasCustomer = docWideHasCustomer != null
+      ? docWideHasCustomer
+      : (/LG생활건강/.test(blockText) || /더페이스샵/.test(blockText));
+    if (!hasCustomer) return null;
+    if (!/끝자리/.test(blockText) || !/알파벳/.test(blockText)) return null;
+    return { rule_type: "lg_hc_code", raw: blockText };
+  }
+
+  function buildLgHcCode(bulkPrefix) {
+    if (!bulkPrefix) return null;
+    const LD = global.LotDecode;
+    const alpha = LD ? LD.numberToAlphaBase26(bulkPrefix.seq) : null;
+    if (!alpha) return null;
+    return `${bulkPrefix.year % 10}${alpha}`;
+  }
+
+  // ---------- 페리페라형 판매문서: 계산식 없이 지정관리번호 하나만 적혀있는 경우 ----------
+  // 코스맥스 EADEM/페리페라처럼 "관리번호(또는 지정관리번호): ABC123" 식으로 고객사가
+  // 이미 정해둔 코드 하나만 문서에 박혀있는 경우 - 계산식이 아니라 그 코드를 그대로
+  // 관리번호로 쓰면 된다는 뜻이므로 전체 원문에서 찾아 제안한다.
+  function findDesignatedMgmtCode(fullText) {
+    if (!fullText) return null;
+    const re = /지정\s*관리번호\s*[:：]\s*([A-Za-z0-9]{2,12})|관리번호\s*[:：]\s*([A-Za-z0-9]{2,12})/g;
+    let m;
+    while ((m = re.exec(fullText))) {
+      const code = (m[1] || m[2] || "").toUpperCase();
+      if (code && !EXCLUDED_CODE_TOKENS.has(code)) return code;
+    }
+    return null;
+  }
+
   function isoToParts(isoStr) {
     if (!isoStr) return null;
     const m = isoStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -197,13 +330,25 @@
     if (text == null) return null;
     text = text.trim();
 
+    // 연도가 맨 앞인 형식(YYYYMMDD 등)을 먼저 확인하고, 없으면 EU(DD먼저)/US OTC·비EU
+    // 아마존(MM먼저) 등 연도-비선행 형식을 확인한다 (예: "EXPDDMMYYYY" 구분자 없음,
+    // "EXP MM-DD-YYYY" 처럼 "까지" 문구 없이 쓰이는 형식). 코스알엑스처럼 "일" 없이
+    // 월/연도만 찍는 "MM-YYYY" 전용 표기도 함께 지원한다.
     let dateFmt = null;
     if (/YYYYMMDD/i.test(text)) dateFmt = "YYYYMMDD";
     else if (/Y{4}[-./]M{2}[-./]D{2}/i.test(text)) dateFmt = "YYYY-MM-DD";
     else if (/Y{4}[-./]M{2}(?![-./]?D)/i.test(text)) dateFmt = "YYYY-MM";
     else if (/Y{2}[-./]M{2}[-./]D{2}/i.test(text)) dateFmt = "YY/MM/DD";
+    else if (/DDMMYYYY/i.test(text)) dateFmt = "DDMMYYYY";
+    else if (/D{2}[-./]M{2}[-./]Y{4}/i.test(text)) dateFmt = "DD-MM-YYYY";
+    else if (/MMDDYYYY/i.test(text)) dateFmt = "MMDDYYYY";
+    else if (/M{2}[-./]D{2}[-./]Y{4}/i.test(text)) dateFmt = "MM-DD-YYYY";
+    else if (/M{2}[-./]Y{4}/i.test(text)) dateFmt = "MM-YYYY";
 
-    const stripped = text.replace(/Y{2,4}[-./]?M{2}(?:[-./]?D{2})?/gi, "");
+    const stripped = text.replace(
+      /(?:Y{2,4}[-./]?M{2}(?:[-./]?D{2})?|D{2}[-./]?M{2}[-./]?Y{2,4}|M{2}[-./]?D{2}[-./]?Y{2,4}|M{2}[-./]?Y{2,4})/gi,
+      ""
+    );
     let exampleCode = null;
     const codeRe = /[A-Za-z0-9]{2,10}/g;
     let cm;
@@ -258,6 +403,9 @@
   function parsePackagingSpec(text) {
     const blocks = splitSteps(text);
     const results = [];
+    // LG생활건강/더페이스샵 같은 고객사명은 문서 맨 위 제목에만 한 번 적혀 있고
+    // 번호 단계 본문엔 반복되지 않는 경우가 많아, 문서 전체 기준으로 한 번만 판단한다.
+    const docWideHasLgHcCustomer = /LG생활건강/.test(text) || /더페이스샵/.test(text);
     for (const b of blocks) {
       const blockText = b.lines.join("\n");
       const hasMgmtNo = blockText.includes("관리번호");
@@ -265,12 +413,26 @@
 
       const basis = parseBasis(blockText);
       const fmt = parseFormatTemplate(blockText);
-      const codeRule = parseDayOfYearCodeRule(blockText);
+      const codeRule = parseDayOfYearCodeRule(blockText)
+        || parseGenLokCodeRule(blockText)
+        || parseCosmaxCaJulianCodeRule(blockText)
+        || parseLgHcCodeRule(blockText, docWideHasLgHcCustomer);
       const hasCalc = !!(basis && basis.ops.length);
       const hasOwnExample = !!(fmt.example_code || fmt.front_face || fmt.back_face);
       const isCodingStep = hasCalc || hasOwnExample || !!codeRule;
 
-      const entry = { step_no: b.no, title: b.lines[0].trim(), is_coding_step: isCodingStep };
+      // 제목 결정: 번호가 있는 블록(b.no != null)은 splitSteps에서 "번호 뒤에 한글이
+      // 있어야만" 새 단계로 인정하므로, 그 블록의 첫 줄(lines[0])은 항상 그 한글을
+      // 포함한 진짜 제목 줄이다 - 그대로 쓰면 된다.
+      // preamble 블록(b.no === null, 첫 번째 진짜 번호 단계가 나오기 전의 내용)은
+      // 다르다 - 어느 줄이 "제목"에 해당하는지 알 수 있는 단서가 없고, OCR이 "-"
+      // 같은 불릿 기호까지 지워버리는 경우가 있어서(예: "-용기 라벨 부착"이
+      // "다선 [...]"처럼 기호 없이 깨짐) 내용으로 진짜 제목 줄을 구분해내는 건
+      // 신뢰할 수 없다. 이런 경우 아무 줄이나 집어 제목인 것처럼 보여주면 오히려
+      // 헷갈리므로, 번호를 읽지 못했다는 걸 솔직하게 알려주는 고정 문구를 쓴다
+      // (실제 계산 내용은 아래 기준/각인 줄에 그대로 표시되니 정보 손실은 없다).
+      const titleLine = b.no != null ? b.lines[0].trim() : '(번호를 읽지 못한 단계 - 아래 계산 내용 확인)';
+      const entry = { step_no: b.no, title: titleLine, is_coding_step: isCodingStep };
       if (isCodingStep) {
         entry.basis = basis;
         entry.format = fmt;
@@ -380,8 +542,9 @@
 
   function parseDocument(text) {
     const style = detectDocumentStyle(text);
-    if (style === "batch_sheet") return { style, entries: parseOperationBatchSheet(text) };
-    return { style, entries: parsePackagingSpec(text) };
+    const designatedMgmtCode = findDesignatedMgmtCode(text);
+    if (style === "batch_sheet") return { style, entries: parseOperationBatchSheet(text), designatedMgmtCode };
+    return { style, entries: parsePackagingSpec(text), designatedMgmtCode };
   }
 
   // ---------- 결과 렌더링(화면 표시용) 헬퍼 ----------
@@ -411,5 +574,8 @@
     detectDocumentStyle, parseDocument,
     formatDateByPattern, isoToParts, partsToIso, renderStampText,
     dayOfYear, pad3, buildDayOfYearCode, parseDayOfYearCodeRule,
+    genLokYearLetter, genLokMonthCode, buildGenLokCode, genLokFixedDays, applyFixedDays,
+    parseGenLokCodeRule, buildCosmaxCaJulianCode, parseCosmaxCaJulianCodeRule,
+    parseLgHcCodeRule, buildLgHcCode, findDesignatedMgmtCode,
   };
 })(typeof window !== "undefined" ? window : globalThis);

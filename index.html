@@ -221,7 +221,7 @@
     <label class="photo-dropzone" id="dropzoneLabel">
       <span class="icon">📷</span>
       <span class="cta">사진 찍기 · 업로드</span>
-      <span class="cta-sub">제조번호/제조일자가 보이도록 찍어주세요</span>
+      <span class="cta-sub">제조번호/제조일자가 보이도록, 곡면 라벨은 평평하게 펴거나 정면에서 찍어주세요 (회전/기울임 없이)</span>
       <input type="file" id="photoInputLabel" accept="image/*" capture="environment">
     </label>
     <div class="photo-result-row" id="photoResultRowLabel" style="display:none;">
@@ -231,6 +231,7 @@
       </div>
       <button class="retake-btn" id="retakeBtnLabel" type="button">다시 찍기</button>
     </div>
+    <p class="ocr-status" id="glareWarningLabel" style="display:none;color:var(--warn);font-weight:700;margin-top:8px;">💡 빛반사가 심해 보여요 — 각도를 바꾸거나 조명을 피해서 다시 찍으면 인식이 더 잘 돼요.</p>
 
     <details class="manual" id="manualDetailsLabel">
       <summary>제조번호 · 제조일자 직접 입력 / 수정</summary>
@@ -257,7 +258,7 @@
     <label class="photo-dropzone" id="dropzoneSpec">
       <span class="icon">📋</span>
       <span class="cta">사진 찍기 · 업로드</span>
-      <span class="cta-sub">착인 계산식이 적힌 단계(번호 목록) 부분이 잘 보이게 찍어주세요</span>
+      <span class="cta-sub">착인 계산식이 적힌 단계(번호 목록) 부분이 크게 보이게, 평평한 곳에 놓고 수직으로 찍어주세요</span>
       <input type="file" id="photoInputSpec" accept="image/*" capture="environment">
     </label>
     <div class="photo-result-row" id="photoResultRowSpec" style="display:none;">
@@ -267,6 +268,7 @@
       </div>
       <button class="retake-btn" id="retakeBtnSpec" type="button">다시 찍기</button>
     </div>
+    <p class="ocr-status" id="glareWarningSpec" style="display:none;color:var(--warn);font-weight:700;margin-top:8px;">💡 빛반사가 심해 보여요 — 각도를 바꾸거나 조명을 피해서 다시 찍으면 인식이 더 잘 돼요.</p>
 
     <details class="manual" id="manualDetailsSpec">
       <summary>인식된 글자 확인 / 직접 수정</summary>
@@ -298,13 +300,15 @@
       <p class="hint">이 포장기준서는 벌크 제조일이 아니라 <b>포장일 기준</b>으로 사용기한을 계산해요. 벌크라벨 사진만으로는 알 수 없는 값이라 직접 입력해주세요.</p>
     </div>
     <div class="field" id="codeRuleFields" hidden>
-      <label for="mfrCode">제조사코드 (관리번호 앞 2자리)</label>
-      <input type="text" id="mfrCode" placeholder="CM" autocomplete="off" spellcheck="false" maxlength="2">
-      <p class="hint">이 포장기준서는 관리번호를 <b>포장일자로부터 직접 계산</b>해서 만드는 서식이에요(제조사코드 + 연중 며칠째 + 포장년도 끝자리 + 배치번호). 제조사코드는 문서에서 자동으로 채웠어요 — 틀렸으면 고쳐주세요.</p>
+      <div class="field" id="mfrCodeField">
+        <label for="mfrCode" id="mfrCodeLabel">제조사코드 (관리번호 앞 2자리)</label>
+        <input type="text" id="mfrCode" placeholder="CM" autocomplete="off" spellcheck="false" maxlength="2">
+        <p class="hint" id="mfrCodeHint">이 포장기준서는 관리번호를 <b>포장일자로부터 직접 계산</b>해서 만드는 서식이에요(제조사코드 + 연중 며칠째 + 포장년도 끝자리 + 배치번호). 제조사코드는 문서에서 자동으로 채웠어요 — 틀렸으면 고쳐주세요.</p>
+      </div>
       <div class="field" style="margin-top:10px;">
-        <label for="batchNum">배치번호 (오늘 포장 중 몇 번째 배치인지)</label>
-        <input type="text" id="batchNum" placeholder="1" autocomplete="off" spellcheck="false" inputmode="numeric">
-        <p class="hint">사진만으로는 알 수 없는 값이라 직접 입력해주세요. 하루에 한 배치만 포장한다면 보통 1이에요.</p>
+        <label for="batchNum" id="batchNumLabel">배치번호 (오늘 포장 중 몇 번째 배치인지)</label>
+        <input type="text" id="batchNum" placeholder="1" autocomplete="off" spellcheck="false">
+        <p class="hint" id="batchNumHint">사진만으로는 알 수 없는 값이라 직접 입력해주세요. 하루에 한 배치만 포장한다면 보통 1이에요.</p>
       </div>
     </div>
   </section>
@@ -316,7 +320,8 @@
 
   <section>
     <p class="section-title">지원 범위 / 알려진 한계</p>
-    <p class="hint" style="margin:0 0 8px;">지금은 자사 로트체계(벌크라벨)와, "번호 붙은 단계 + [기준, N개월-M일] 계산식" 또는 코스맥스 "OPERATION BATCH SHEET"(N년 후 그 달로 반올림) 두 가지 포장기준서 서식을 자동 인식합니다.</p>
+    <p class="hint" style="margin:0 0 8px;">자사 로트체계(벌크라벨)와 함께, 다음 포장기준서 서식들을 자동 인식합니다: ① "번호 붙은 단계 + [기준, N개월-M일] 계산식" 일반형, ② 코스맥스 "OPERATION BATCH SHEET"(N년 후 그 달로 반올림), ③ 뉴스킨형 포장일 기준 연중 날짜코드, ④ 클리오형 벌크일 기준 연/월 알파벳코드, ⑤ LG생활건강(더페이스샵 등) 벌크제조년도 끝자리+번호 알파벳변환, ⑥ 고운세상(Dr.G)/GEN·LOK 충전년월코드+고정일수표, ⑦ 코스맥스 California/NATURIUM 줄리안데이 LOT#, ⑧ 코스알엑스 "N개월-M개월"/MM-YYYY 표기, ⑨ 페리페라 등 문서에 지정 관리번호가 적힌 서식(자동으로 그 값을 우선 사용), ⑩ EU·US向 DDMMYYYY/MMDDYYYY·MM-YYYY 날짜형식.</p>
+    <p class="hint" style="margin:0 0 8px;">사진이 심하게 반사되면("하얗게 날아간" 부분이 많으면) 인식 전에 경고가 표시됩니다 — 이때는 다시 찍어주세요.</p>
     <div class="roadmap">
       <span class="chip disabled">그 외 특이 서식 · 순차 추가 예정</span>
     </div>
@@ -343,6 +348,7 @@
   const retakeBtnLabel = document.getElementById('retakeBtnLabel');
   const ocrStatusLabel = document.getElementById('ocrStatusLabel');
   const manualDetailsLabel = document.getElementById('manualDetailsLabel');
+  const glareWarningLabel = document.getElementById('glareWarningLabel');
 
   photoInputLabel.addEventListener('change', async ()=>{
     const file = photoInputLabel.files && photoInputLabel.files[0];
@@ -355,6 +361,7 @@
     retakeBtnLabel.style.display = 'inline-block';
     ocrStatusLabel.className = 'ocr-status loading';
     ocrStatusLabel.innerHTML = '<span class="spinner"></span>준비 중...';
+    glareWarningLabel.style.display = 'none';
 
     mfgInput.value = '';
     mfgDateInput.value = '';
@@ -365,6 +372,8 @@
         years: 3, minusDay: false,
         onProgress: (msg)=>{ ocrStatusLabel.innerHTML = '<span class="spinner"></span>' + msg; }
       });
+
+      glareWarningLabel.style.display = data.glare_warning ? 'block' : 'none';
 
       let found = false;
       if(data.found_mfg){ mfgInput.value = data.found_mfg; found = true; }
@@ -418,6 +427,7 @@
   const ocrStatusSpec = document.getElementById('ocrStatusSpec');
   const manualDetailsSpec = document.getElementById('manualDetailsSpec');
   const specText = document.getElementById('specText');
+  const glareWarningSpec = document.getElementById('glareWarningSpec');
 
   photoInputSpec.addEventListener('change', async ()=>{
     const file = photoInputSpec.files && photoInputSpec.files[0];
@@ -431,12 +441,14 @@
     ocrStatusSpec.className = 'ocr-status loading';
     ocrStatusSpec.innerHTML = '<span class="spinner"></span>준비 중...';
     specText.value = '';
+    glareWarningSpec.style.display = 'none';
     renderAll();
 
     try{
       const data = await SpecOcrEngine.analyzeSpecImage(file, {
         onProgress: (msg)=>{ ocrStatusSpec.innerHTML = '<span class="spinner"></span>' + msg; }
       });
+      glareWarningSpec.style.display = data.glare_warning ? 'block' : 'none';
       specText.value = data.text.trim();
       const hasCoding = data.parsed.entries.some(e => e.is_coding_step || e.has_expiry_on_label);
       if(hasCoding){
@@ -463,8 +475,46 @@
   const packagingDateField = document.getElementById('packagingDateField');
   const packagingDateInput = document.getElementById('packagingDate');
   const codeRuleFields = document.getElementById('codeRuleFields');
+  const mfrCodeField = document.getElementById('mfrCodeField');
   const mfrCodeInput = document.getElementById('mfrCode');
+  const mfrCodeLabel = document.getElementById('mfrCodeLabel');
+  const mfrCodeHint = document.getElementById('mfrCodeHint');
   const batchNumInput = document.getElementById('batchNum');
+  const batchNumLabel = document.getElementById('batchNumLabel');
+  const batchNumHint = document.getElementById('batchNumHint');
+
+  const RULE_FIELD_PRESETS = {
+    nuskin: {
+      showMfrCode: true,
+      mfrLabel: '제조사코드 (관리번호 앞 2자리)',
+      mfrHint: '이 포장기준서는 관리번호를 <b>포장일자로부터 직접 계산</b>해서 만드는 서식이에요(제조사코드 + 연중 며칠째 + 포장년도 끝자리 + 배치번호). 제조사코드는 문서에서 자동으로 채웠어요 — 틀렸으면 고쳐주세요.',
+      batchLabel: '배치번호 (오늘 포장 중 몇 번째 배치인지)',
+      batchHint: '사진만으로는 알 수 없는 값이라 직접 입력해주세요. 하루에 한 배치만 포장한다면 보통 1이에요.',
+      batchPlaceholder: '1',
+    },
+    gen_lok: {
+      showMfrCode: false,
+      batchLabel: '해당월 충전일순번 (매월 0부터, I/O/Q 미사용)',
+      batchHint: '고운세상(Dr.G)/GEN·LOK 체계는 관리번호에 "그 달 몇 번째 충전일인지"가 들어가요. 전산실적 등에서 확인해 직접 입력해주세요(작업일이 바뀔 때만 증가).',
+      batchPlaceholder: '예: 5',
+    },
+    cosmax_ca: {
+      showMfrCode: false,
+      batchLabel: '당일 배치문자 (A=그날 첫 벌크배치, B=두 번째...)',
+      batchHint: 'COSMAX California/NATURIUM 체계는 LOT# 끝자리에 같은 날 충진된 몇 번째 벌크배치인지가 들어가요. 직접 입력해주세요.',
+      batchPlaceholder: '예: A',
+    },
+  };
+
+  function applyRuleFieldPreset(mode){
+    const p = RULE_FIELD_PRESETS[mode] || RULE_FIELD_PRESETS.nuskin;
+    mfrCodeField.hidden = !p.showMfrCode;
+    if(p.mfrLabel) mfrCodeLabel.textContent = p.mfrLabel;
+    if(p.mfrHint) mfrCodeHint.innerHTML = p.mfrHint;
+    batchNumLabel.textContent = p.batchLabel;
+    batchNumHint.textContent = p.batchHint;
+    batchNumInput.placeholder = p.batchPlaceholder || '';
+  }
   let mgmtCodeTouched = false;
   let mfrCodeTouched = false;
   mgmtCodeInput.addEventListener('input', ()=>{ mgmtCodeTouched = true; renderAll(); });
@@ -493,7 +543,13 @@
     return `<div class="face"><span class="face-label">${label}</span><span class="face-value">${text || '(내용 없음)'}</span></div>`;
   }
 
-  function renderPackagingSpecResults(entries, mgmtCode, bulkMfgDateIso, packagingDateIso, mfrCode, batchNum){
+  // spec-decode.js가 번호를 못 읽은 단계(preamble)에 붙이는 고정 안내 문구 - 이 문구가
+  // 보이면, 실제 계산이 끝나는 시점에 "번호 대신 실제 각인 문구"로 바꿔치기한다
+  // (사용자 요청: 제목 자리에 의미없는 안내문 대신 실제로 찍을 문구를 보여달라).
+  const NO_NUMBER_TITLE = '(번호를 읽지 못한 단계 - 아래 계산 내용 확인)';
+  const NO_NUMBER_TITLE_TOKEN = '\u0000NO_NUMBER_TITLE\u0000';
+
+  function renderPackagingSpecResults(entries, mgmtCode, bulkMfgDateIso, packagingDateIso, mfrCode, batchNum, bulkPrefix){
     const codingSteps = entries.filter(e => e.is_coding_step);
     if(!codingSteps.length){
       return '<p class="empty-hint">착인 계산식이 있는 단계를 찾지 못했어요. 위 "인식된 글자" 텍스트를 사진과 대조해서 직접 고쳐주세요.</p>';
@@ -501,6 +557,7 @@
     let html = '';
     let needsPackagingDate = false;
     let needsCodeRuleFields = false;
+    let fieldsMode = 'nuskin';
     let lastDateFmt = null; // 관리번호/사용기한 형식 설명이 처음 나온 단계에만 있고 뒤 단계는 값만 반복하는 경우 대비
 
     for(const step of codingSteps){
@@ -510,23 +567,115 @@
       let baseIso = null, basisLabel = '';
       if(codeRule || (basis && basis.basis_type === 'packaging_date')){
         baseIso = packagingDateIso || null;
-        basisLabel = '포장일';
+        basisLabel = codeRule && codeRule.rule_type === 'cosmax_ca_julian_code' ? '충진일' : '포장일';
         if(!baseIso) needsPackagingDate = true;
       } else {
         baseIso = bulkMfgDateIso || null;
         basisLabel = '벌크제조일';
       }
 
-      html += `<div class="step-card"><div class="step-title">${escapeHtml(step.title)}</div>`;
+      const isNoNumberTitle = step.title === NO_NUMBER_TITLE;
+      html += `<div class="step-card"><div class="step-title">${isNoNumberTitle ? NO_NUMBER_TITLE_TOKEN : escapeHtml(step.title)}</div>`;
+      // 제목이 "번호를 못 읽은 단계" 안내문이었던 경우, 아래에서 실제 착인 문구(stampText)를
+      // 구하는 즉시 그 안내문 자리를 그 문구로 바꿔친다 - 못 구했으면 짧은 안내문을 대신 쓴다.
+      const fillTitle = (stampText) => {
+        if (isNoNumberTitle) html = html.replace(NO_NUMBER_TITLE_TOKEN, escapeHtml(stampText));
+      };
 
+      // ---- LG생활건강: 관리번호는 벌크번호(연도+순번)에서 직접 계산, 사용기한은 일반 계산식 로직 재사용 ----
+      if(codeRule && codeRule.rule_type === 'lg_hc_code'){
+        const computedCode = SpecDecode.buildLgHcCode(bulkPrefix);
+        let expiryNote = '(사용기한 계산식을 인식 못했어요 - 원문 확인 필요)';
+        if(basis && basis.ops && basis.ops.length && bulkMfgDateIso){
+          const bp = SpecDecode.isoToParts(bulkMfgDateIso);
+          const ep = SpecDecode.applyOps(bp, basis.ops);
+          expiryNote = SpecDecode.partsToIso(ep);
+        }
+        const stampText = `관리번호 ${computedCode || '(벌크라벨 제조번호 필요)'} + 사용기한 ${expiryNote}`;
+        html += `<div class="step-basis">관리번호 계산(LG생활건강 전용): <b>벌크제조년도 끝자리</b> + <b>벌크제조번호 알파벳변환</b>(1=A,2=B...)</div>`;
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">${escapeHtml(stampText)}</span></div></div></div>`;
+        fillTitle(stampText);
+        continue;
+      }
+
+      // ---- 고운세상(Dr.G)/GEN·LOK: 관리번호는 충전년/월코드+충전일순번, 사용기한은 고정일수표 ----
+      if(codeRule && codeRule.rule_type === 'gen_lok_code'){
+        needsCodeRuleFields = true; fieldsMode = 'gen_lok';
+        if(!baseIso){
+          html += `<div class="missing">충전일(또는 포장일) 값이 없어 계산할 수 없어요 — 위에서 포장일자를 입력해주세요.</div></div>`;
+          fillTitle('충전일(포장일) 입력 필요');
+          continue;
+        }
+        const bp = SpecDecode.isoToParts(baseIso);
+        const computedCode = SpecDecode.buildGenLokCode(bp, batchNum);
+        let expiryDisplay = '(개월수를 확인 못했어요 - 사용기한 직접계산 금지, 품질팀 공유표 참고)';
+        if(codeRule.fixed_days != null){
+          const fp = SpecDecode.applyFixedDays(bp, codeRule.fixed_days);
+          expiryDisplay = SpecDecode.partsToIso(fp);
+        }
+        const stampText = `관리번호 ${computedCode || '(충전일순번 입력 필요)'} + 사용기한 ${expiryDisplay}`;
+        html += `<div class="step-basis">기준: <b>충전일 ${baseIso}</b> · 계산: <b>고정일수표(${codeRule.months != null ? codeRule.months : '?'}개월 → ${codeRule.fixed_days != null ? codeRule.fixed_days : '?'}일)</b> — 캘린더 월 계산이 아니라 고정 일수를 더해요</div>`;
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">${escapeHtml(stampText)}</span></div></div></div>`;
+        fillTitle(stampText);
+        continue;
+      }
+
+      // ---- COSMAX California/NATURIUM: LOT# = X + 연도끝자리 + 줄리안데이 + 당일배치문자 ----
+      if(codeRule && codeRule.rule_type === 'cosmax_ca_julian_code'){
+        needsCodeRuleFields = true; fieldsMode = 'cosmax_ca';
+        if(!baseIso){
+          html += `<div class="missing">충진일 값이 없어 계산할 수 없어요 — 위에서 포장일자(충진일)를 입력해주세요.</div></div>`;
+          fillTitle('충진일 입력 필요');
+          continue;
+        }
+        const bp = SpecDecode.isoToParts(baseIso);
+        const computedCode = SpecDecode.buildCosmaxCaJulianCode(bp, batchNum);
+        const doy = SpecDecode.dayOfYear(bp.y, bp.mo, bp.d);
+        const stampText = `LOT# ${computedCode || '(당일 배치문자 입력 필요)'}`;
+        html += `<div class="step-basis">관리번호(LOT#) 계산: <b>X</b>(고정) + <b>${bp.y % 10}</b>(연도 끝자리) + <b>${SpecDecode.pad3(doy)}</b>(줄리안데이, 충진일 기준) + 당일배치문자</div>`;
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">${escapeHtml(stampText)}</span></div></div></div>`;
+        fillTitle(stampText);
+        continue;
+      }
+
+      // ---- 뉴스킨형: 포장일자 기반 연중 며칠째 코드 ----
+      if(codeRule && codeRule.rule_type === 'day_of_year_code'){
+        needsCodeRuleFields = true; fieldsMode = 'nuskin';
+        if(!baseIso){
+          html += `<div class="missing">포장일 값이 없어 계산할 수 없어요 — 위에서 포장일자를 입력해주세요.</div></div>`;
+          fillTitle('포장일 입력 필요');
+          continue;
+        }
+        const bp = SpecDecode.isoToParts(baseIso);
+        const effectiveMfrCode = (mfrCode || codeRule.mfr_code || '').toUpperCase();
+        const computedCode = SpecDecode.buildDayOfYearCode(effectiveMfrCode, bp, batchNum);
+        const doy = SpecDecode.dayOfYear(bp.y, bp.mo, bp.d);
+        const ownDateFmt = (fmt && ((fmt.front_face && fmt.front_face.date_format) || (fmt.back_face && fmt.back_face.date_format))) || null;
+        const dateFmt = ownDateFmt || lastDateFmt;
+        if(ownDateFmt) lastDateFmt = ownDateFmt;
+        let expiryDisplay = '(사용기한 계산식을 인식 못했어요)';
+        if(basis && basis.ops && basis.ops.length){
+          const ep = SpecDecode.applyOps(bp, basis.ops);
+          expiryDisplay = dateFmt ? SpecDecode.formatDateByPattern(ep, dateFmt) : SpecDecode.partsToIso(ep);
+        }
+        const stampText = `관리번호 ${computedCode || '(미입력)'} + 사용기한 ${expiryDisplay}`;
+        html += `<div class="step-basis">관리번호 계산: <b>${escapeHtml(effectiveMfrCode || '(제조사코드?)')}</b> + <b>${SpecDecode.pad3(doy)}</b>(연중 ${doy}번째 날) + <b>${bp.y % 10}</b>(${bp.y}년 끝자리) + <b>${escapeHtml(String(batchNum||''))}</b>(배치번호)</div>`;
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">${escapeHtml(stampText)}</span></div></div></div>`;
+        fillTitle(stampText);
+        continue;
+      }
+
+      // ---- 그 외: 일반 계산식(대괄호 N개월/일/년) 단계 ----
       if(!basis || !basis.ops || !basis.ops.length){
         html += `<div class="step-basis">계산식을 인식하지 못했어요. 원문: <b>${escapeHtml(basis ? basis.raw : '')}</b></div></div>`;
+        fillTitle('계산식 인식 실패 - 원문 확인 필요');
         continue;
       }
 
       if(!baseIso){
         html += `<div class="step-basis">기준: <b>${basisLabel}</b> · 계산: <b>${opsDescription(basis.ops)}</b></div>`;
         html += `<div class="missing">${basisLabel} 값이 없어 사용기한을 계산할 수 없어요 — ${basisLabel === '포장일' ? '위에서 포장일자를 입력해주세요.' : '벌크라벨 제조일자를 입력해주세요.'}</div></div>`;
+        fillTitle(`${basisLabel} 입력 필요`);
         continue;
       }
 
@@ -536,34 +685,35 @@
 
       html += `<div class="step-basis">기준: <b>${basisLabel} ${baseIso}</b> · 계산: <b>${opsDescription(basis.ops)}</b> → 사용기한 <b>${expiryIso}</b></div>`;
 
-      if(codeRule){
-        needsCodeRuleFields = true;
-        const effectiveMfrCode = (mfrCode || codeRule.mfr_code || '').toUpperCase();
-        const computedCode = SpecDecode.buildDayOfYearCode(effectiveMfrCode, baseParts, batchNum);
-        const doy = SpecDecode.dayOfYear(baseParts.y, baseParts.mo, baseParts.d);
-        const ownDateFmt = (fmt && ((fmt.front_face && fmt.front_face.date_format) || (fmt.back_face && fmt.back_face.date_format))) || null;
-        const dateFmt = ownDateFmt || lastDateFmt;
-        if(ownDateFmt) lastDateFmt = ownDateFmt;
-        const expiryDisplay = dateFmt ? SpecDecode.formatDateByPattern(expiryParts, dateFmt) : expiryIso;
-        html += `<div class="step-basis">관리번호 계산: <b>${escapeHtml(effectiveMfrCode || '(제조사코드?)')}</b> + <b>${SpecDecode.pad3(doy)}</b>(연중 ${doy}번째 날) + <b>${baseParts.y % 10}</b>(${baseParts.y}년 끝자리) + <b>${escapeHtml(String(batchNum||''))}</b>(배치번호)</div>`;
-        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">관리번호 ${computedCode || '(미입력)'} + 사용기한 ${expiryDisplay || '(미입력)'}</span></div></div>`;
-        html += `</div>`;
-        continue;
-      }
-
       const values = { code: mgmtCode, mfgStr: baseIso, expiryStr: expiryIso };
+      let stampText;
       if(fmt && fmt.is_split_face){
         html += `<div class="face-row">` + faceRowHtml('전면', fmt.front_face, values) + faceRowHtml('후면', fmt.back_face, values) + `</div>`;
+        const frontText = SpecDecode.renderStampText(fmt.front_face, values);
+        const backText = SpecDecode.renderStampText(fmt.back_face, values);
+        stampText = [frontText, backText].filter(Boolean).join(' / ') || '(내용 없음)';
       } else if(fmt && fmt.front_face){
         html += `<div class="face-row">` + faceRowHtml('각인', fmt.front_face, values) + `</div>`;
+        stampText = SpecDecode.renderStampText(fmt.front_face, values) || '(내용 없음)';
+      } else if(fmt && fmt.has_exp_marker){
+        // 예시 문구("예) ABC EXP[공란]YYYYMMDD까지")가 OCR 잡음 때문에 통째로 인식되지
+        // 못했어도, 문서 안에 "EXP"가 있다는 건 확인됐으므로 - 거의 모든 포장기준서가
+        // 공통으로 쓰는 "관리번호 EXP 사용기한(YYYYMMDD)까지" 형식을 기본값으로 보여준다.
+        // (fmt.date_format이 따로 인식됐으면 그 형식을, 아니면 YYYYMMDD를 쓴다.)
+        const stampDateStr = SpecDecode.formatDateByPattern(expiryParts, fmt.date_format || 'YYYYMMDD');
+        stampText = `${mgmtCode || '(미입력)'} EXP ${stampDateStr}까지`;
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">${escapeHtml(stampText)}</span></div></div>`;
       } else {
-        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">관리번호 ${mgmtCode || '(미입력)'} + 사용기한 ${expiryIso}</span></div></div>`;
+        stampText = `관리번호 ${mgmtCode || '(미입력)'} + 사용기한 ${expiryIso}`;
+        html += `<div class="face-row"><div class="face"><span class="face-label">각인</span><span class="face-value">${escapeHtml(stampText)}</span></div></div>`;
       }
       html += `</div>`;
+      fillTitle(stampText);
     }
 
     packagingDateField.hidden = !needsPackagingDate;
     codeRuleFields.hidden = !needsCodeRuleFields;
+    if(needsCodeRuleFields) applyRuleFieldPreset(fieldsMode);
     return html;
   }
 
@@ -596,7 +746,6 @@
   function renderAll(){
     const text = specText.value.trim();
     const bulkMfgDateIso = mfgDateInput.value || null;
-    const mgmtCode = mgmtCodeInput.value.trim();
 
     if(!text){
       resultSection.hidden = true;
@@ -609,6 +758,14 @@
     resultSection.hidden = false;
 
     const doc = SpecDecode.parseDocument(text);
+
+    // 페리페라 등 일부 서식은 포장기준서 자체에 "지정 관리번호"가 쓰여 있어서
+    // 벌크라벨 제조번호 끝자리로 추정하는 기본값보다 이 값이 우선이에요.
+    if(doc.designatedMgmtCode && !mgmtCodeTouched){
+      mgmtCodeInput.value = doc.designatedMgmtCode;
+    }
+    const mgmtCode = mgmtCodeInput.value.trim();
+
     if(doc.style === 'batch_sheet'){
       resultBody.innerHTML = renderBatchSheetResults(doc.entries, mgmtCode, bulkMfgDateIso);
     } else {
@@ -616,9 +773,10 @@
         const found = doc.entries.find(e => e.code_rule && e.code_rule.mfr_code);
         if(found) mfrCodeInput.value = found.code_rule.mfr_code;
       }
+      const bulkPrefix = LotDecode.extractBulkPrefix(mfgInput.value);
       resultBody.innerHTML = renderPackagingSpecResults(
         doc.entries, mgmtCode, bulkMfgDateIso, packagingDateInput.value || null,
-        mfrCodeInput.value.trim(), batchNumInput.value.trim() || '1'
+        mfrCodeInput.value.trim(), batchNumInput.value.trim() || '1', bulkPrefix
       );
     }
   }
