@@ -55,15 +55,26 @@
       }
       blankRun = 0;
 
-      const m = line.match(/^\s*(\d+)\s*[.)]\s*(.*)$/);
+      // 줄 맨 앞에 번호가 와야 하지만, OCR이 스캔 잡음(얇은 세로줄, 여백 얼룩 등)을
+      // ":", "|", ";" 같은 엉뚱한 기호로 잘못 읽어서 번호 바로 앞에 끼워넣는 경우가
+      // 실측으로 확인됐다(예: "2.단상자에 용기, 선대 포장"이 ":       2.단상자에..."로
+      // 읽힘) - 이러면 번호가 줄 맨 처음이 아니게 되어 아래 정규식이 전혀 매치가 안
+      // 되고, 그 결과 진짜 "2."단계가 안 쪼개져서 "1."단계 안에 통째로 섞여버렸다.
+      // 그래서 번호 앞에 글자/숫자/한글이 아닌 기호가 최대 2개까지 끼어있는 것까지는
+      // 허용한다(기호가 너무 많이 끼면 번호가 아닐 가능성이 커지므로 2개로 제한).
+      const m = line.match(/^\s*[^\w\s가-힣]{0,2}\s*(\d+)\s*([.)])\s*(.*)$/);
       // OCR 잡음(예: "EXP[공란]YYYYMMDD까지"가 깨져서 "1)YYYYMMODJIAT"처럼 읽히는 경우)이
       // 숫자+구두점 패턴에 우연히 맞아떨어져 가짜 단계 경계로 오인되는 걸 막기 위해,
       // 번호 뒤 제목에 한글이 하나라도 있어야 "진짜" 새 단계 시작으로 인정한다.
       // 실측한 모든 포장기준서에서 실제 단계 제목은 예외 없이 번호 바로 뒤에 한글이 온다.
-      const isGenuineStepStart = m && /[가-힣]/.test(m[2]);
+      const isGenuineStepStart = m && /[가-힣]/.test(m[3]);
       if (isGenuineStepStart) {
         if (current) blocks.push(current);
-        current = { no: parseInt(m[1], 10), lines: [line] };
+        // 앞에 끼어있던 잡음 기호(":" 등)는 저장할 줄에서 빼고, "번호+구두점+제목"만
+        // 깔끔하게 남긴다 - 안 그러면 그 잡음 기호가 화면에 보이는 단계 제목에도
+        // 그대로 남아 보인다.
+        const cleanedLine = `${m[1]}${m[2]} ${m[3]}`;
+        current = { no: parseInt(m[1], 10), lines: [cleanedLine] };
       } else if (current !== null) {
         current.lines.push(line);
       } else {
@@ -480,6 +491,34 @@
       }
       if (!entry.code_rule && lastCodeRule && entry.basis && entry.basis.ops && entry.basis.ops.length) {
         entry.code_rule = Object.assign({ inherited: true }, lastCodeRule);
+      }
+    }
+
+    // 최후 안전장치: 위에서(블록 단위로) 착인 계산 단계를 하나도 못 찾았다면,
+    // 블록으로 나누는 과정 자체가 문제였을 수 있으니 - 문서 전체 글자를 하나의
+    // 큰 블록으로 보고 다시 한 번 찾아본다. 실측해보면 "단상자", "EXP", "관리번호"
+    // 같은 핵심 단어/숫자+개월 패턴은 사진이 아무리 많이 깨져도 끝까지 살아남는
+    // 경우가 대부분이라, 번호나 문단 구조를 전혀 못 읽어도 이 핵심 내용만으로
+    // 착인 문구를 찾아낼 수 있는 경우가 있다.
+    if (!results.some((e) => e.is_coding_step)) {
+      const basis = parseBasis(text);
+      const fmt = parseFormatTemplate(text);
+      const codeRule = parseDayOfYearCodeRule(text)
+        || parseGenLokCodeRule(text)
+        || parseCosmaxCaJulianCodeRule(text)
+        || parseLgHcCodeRule(text, docWideHasLgHcCustomer);
+      const hasCalc = !!(basis && basis.ops.length);
+      const hasOwnExample = !!(fmt.example_code || fmt.front_face || fmt.back_face);
+      if (hasCalc || hasOwnExample || codeRule) {
+        const entry = {
+          step_no: null,
+          title: '(번호를 읽지 못한 단계 - 아래 계산 내용 확인)',
+          is_coding_step: true,
+          basis,
+          format: fmt,
+        };
+        if (codeRule) entry.code_rule = codeRule;
+        results.push(entry);
       }
     }
     return results;
